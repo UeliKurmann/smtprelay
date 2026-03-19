@@ -32,26 +32,16 @@ const mb = 1024 * 1024
 func init() {
 	ns := applicationName
 
-	// TODO: rename this to add a _total suffix
 	requestsCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: ns,
-		Name:      "requests_count",
+		Name:      "requests_count_total",
 		Help:      "count of message relay requests",
 	})
 
-	// TODO: rename this to add a _total suffix
 	errorsCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: ns,
-		Name:      "errors_count",
+		Name:      "errors_count_total",
 		Help:      "count of unsuccessfully relayed messages",
-	}, []string{"error_code"})
-
-	// TODO: remove this
-	durationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: ns,
-		Name:      "request_duration",
-		Help:      "duration of message relay requests",
-		Buckets:   prometheus.DefBuckets,
 	}, []string{"error_code"})
 
 	durationNative = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -80,37 +70,21 @@ func init() {
 }
 
 func registerMetrics(registry prometheus.Registerer) error {
-	err := registry.Register(requestsCounter)
-	if err != nil {
-		return err
-	}
-	err = registry.Register(errorsCounter)
-	if err != nil {
-		return err
-	}
-	err = registry.Register(durationHistogram)
-	if err != nil {
-		return err
-	}
-	err = registry.Register(durationNative)
-	if err != nil {
-		return err
-	}
-	err = registry.Register(msgSizeHistogram)
-	if err != nil {
-		return err
+	collectors := []prometheus.Collector{
+		requestsCounter,
+		errorsCounter,
+		durationHistogram,
+		durationNative,
+		msgSizeHistogram,
+		rateLimitedCounter,
+		version.NewCollector(applicationName),
 	}
 
-	err = registry.Register(rateLimitedCounter)
-	if err != nil {
-		return err
+	for _, c := range collectors {
+		if err := registry.Register(c); err != nil {
+			return err
+		}
 	}
-
-	err = registry.Register(version.NewCollector(applicationName))
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
