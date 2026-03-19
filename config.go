@@ -50,6 +50,9 @@ type config struct {
 	xoauth2ClientSecret        string
 	xoauth2TokenURL            string
 	xoauth2RefreshToken        string
+	throttleEnabled            bool
+	throttleMessagesPerSecond  float64
+	throttleBurst              int
 	allowedNets                []*net.IPNet
 	logHeaders                 map[string]string
 }
@@ -162,6 +165,9 @@ func registerFlags(f *flag.FlagSet, cfg *config) {
 	f.StringVar(&cfg.xoauth2ClientSecret, "xoauth2_client_secret", "", "Client secret for OAuth2 authentication")
 	f.StringVar(&cfg.xoauth2RefreshToken, "xoauth2_refresh_token", "", "Refresh token for OAuth2 authentication")
 	f.StringVar(&cfg.xoauth2TokenURL, "xoauth2_token_url", "", "OAuth2 token endpoint URL")
+	f.BoolVar(&cfg.throttleEnabled, "throttle_enabled", false, "Enable global throttling for outgoing messages")
+	f.Float64Var(&cfg.throttleMessagesPerSecond, "throttle_messages_per_second", 10, "Maximum messages per second to remote host")
+	f.IntVar(&cfg.throttleBurst, "throttle_burst", 1, "Burst capacity for throttler")
 }
 
 // parse the input into a map[string]string. It should be in the form of

@@ -30,6 +30,7 @@ type relay struct {
 
 	cfg               *config
 	rateLimiter       *rateLimiter
+	throttler         *throttler
 	oauth2TokenSource oauth2.TokenSource
 }
 
@@ -66,6 +67,13 @@ func newRelay(ctx context.Context, cfg *config) (*relay, error) {
 
 	if cfg.rateLimitEnabled {
 		r.rateLimiter = newRateLimiter(cfg.rateLimitMessagesPerSecond, cfg.rateLimitBurst)
+	}
+
+	if cfg.throttleEnabled {
+		r.throttler = newThrottler(cfg.throttleMessagesPerSecond, cfg.throttleBurst)
+		slog.Info("throttling enabled",
+			slog.Float64("messages_per_second", cfg.throttleMessagesPerSecond),
+			slog.Int("burst", cfg.throttleBurst))
 	}
 
 	if cfg.remoteAuth == "xoauth2" {
@@ -405,6 +413,15 @@ func (r *relay) mailHandler(cfg *config) func(ctx context.Context, peer smtpd.Pe
 		}
 
 		msgSizeHistogram.Observe(float64(len(env.Data)))
+
+		// Apply throttling before sending (blocks until allowed)
+		if r.throttler != nil {
+			if err := r.throttler.wait(ctx); err != nil {
+				logger.ErrorContext(ctx, "throttle wait failed", slog.Any("error", err))
+				statusCode = smtpd.ErrForwardingFailed.Code
+				return observeErr(ctx, smtpd.ErrForwardingFailed)
+			}
+		}
 
 		err = smtp.SendMail(
 			cfg.remoteHost,
